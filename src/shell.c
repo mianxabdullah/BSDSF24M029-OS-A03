@@ -1,5 +1,8 @@
 #include "shell.h"
 
+static char* history[HISTORY_SIZE];
+static int history_count = 0;
+
 char* read_cmd(char* prompt, FILE* fp) {
     printf("%s", prompt);
     char* cmdline = (char*) malloc(sizeof(char) * MAX_LEN);
@@ -61,6 +64,28 @@ char** tokenize(char* cmdline) {
     return arglist;
 }
 
+void add_to_history(const char* cmdline) {
+    if (history_count == HISTORY_SIZE) {
+        free(history[0]);                       // drop the oldest
+        memmove(history, history + 1, (HISTORY_SIZE - 1) * sizeof(char*));
+        history_count--;
+    }
+    history[history_count++] = strdup(cmdline);
+}
+
+char* get_history(int n) {
+    if (n < 1 || n > history_count) {
+        return NULL;
+    }
+    return history[n - 1];
+}
+
+void print_history(void) {
+    for (int i = 0; i < history_count; i++) {
+        printf("%d  %s\n", i + 1, history[i]);
+    }
+}
+
 int handle_builtin(char** arglist) {
     if (arglist == NULL || arglist[0] == NULL) {
         return 0;
@@ -86,11 +111,18 @@ int handle_builtin(char** arglist) {
         printf("  cd <dir>     - change directory\n");
         printf("  help         - show this message\n");
         printf("  jobs         - list background jobs (not implemented yet)\n");
+        printf("  history      - show command history\n");
+        printf("  !n           - re-run the n-th command from history\n");
         return 1;
     }
 
     if (strcmp(arglist[0], "jobs") == 0) {
         printf("Job control not yet implemented.\n");
+        return 1;
+    }
+
+    if (strcmp(arglist[0], "history") == 0) {
+        print_history();
         return 1;
     }
 
