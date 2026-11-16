@@ -1,10 +1,12 @@
 #include "shell.h"
+#include <readline/readline.h>
+#include <readline/history.h>
 
 int main() {
     char* cmdline;
     char** arglist;
 
-    while ((cmdline = read_cmd(PROMPT, stdin)) != NULL) {
+    while ((cmdline = readline(PROMPT)) != NULL) {
 
         // Handle !n before tokenizing and before adding to history
         if (cmdline[0] == '!') {
@@ -20,7 +22,8 @@ int main() {
         }
 
         if (cmdline[0] != '\0') {
-            add_to_history(cmdline);
+            add_history(cmdline);       // readline history (arrow keys)
+            add_to_history(cmdline);    // our own history (history, !n)
         }
 
         if ((arglist = tokenize(cmdline)) != NULL) {
