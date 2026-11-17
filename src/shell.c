@@ -3,6 +3,14 @@
 static char* history[HISTORY_SIZE];
 static int history_count = 0;
 
+typedef struct {
+    pid_t pid;
+    char cmd[MAX_LEN];
+} job_t;
+
+static job_t jobs[MAX_JOBS];
+static int job_count = 0;
+
 char* read_cmd(char* prompt, FILE* fp) {
     printf("%s", prompt);
     char* cmdline = (char*) malloc(sizeof(char) * MAX_LEN);
@@ -23,7 +31,7 @@ char* read_cmd(char* prompt, FILE* fp) {
 }
 
 static int is_operator(char c) {
-    return c == '<' || c == '>' || c == '|';
+    return c == '<' || c == '>' || c == '|' || c == '&';
 }
 
 static int is_operator_token(const char* s) {
@@ -147,6 +155,49 @@ void print_history(void) {
     }
 }
 
+void add_job(pid_t pid, const char* cmd) {
+    if (job_count == MAX_JOBS) {
+        fprintf(stderr, "too many background jobs\n");
+        return;
+    }
+    jobs[job_count].pid = pid;
+    strncpy(jobs[job_count].cmd, cmd, MAX_LEN - 1);
+    jobs[job_count].cmd[MAX_LEN - 1] = '\0';
+    job_count++;
+}
+
+static void remove_job(pid_t pid) {
+    for (int i = 0; i < job_count; i++) {
+        if (jobs[i].pid == pid) {
+            printf("[Done] %d %s\n", (int)pid, jobs[i].cmd);
+            for (int j = i; j < job_count - 1; j++) {
+                jobs[j] = jobs[j + 1];
+            }
+            job_count--;
+            return;
+        }
+    }
+}
+
+// Collect finished children without blocking (prevents zombies)
+void reap_jobs(void) {
+    int status;
+    pid_t pid;
+    while ((pid = waitpid(-1, &status, WNOHANG)) > 0) {
+        remove_job(pid);
+    }
+}
+
+void print_jobs(void) {
+    if (job_count == 0) {
+        printf("No background jobs.\n");
+        return;
+    }
+    for (int i = 0; i < job_count; i++) {
+        printf("[%d] %d  %s\n", i + 1, (int)jobs[i].pid, jobs[i].cmd);
+    }
+}
+
 int handle_builtin(char** arglist) {
     if (arglist == NULL || arglist[0] == NULL) {
         return 0;
@@ -171,14 +222,14 @@ int handle_builtin(char** arglist) {
         printf("  exit         - exit the shell\n");
         printf("  cd <dir>     - change directory\n");
         printf("  help         - show this message\n");
-        printf("  jobs         - list background jobs (not implemented yet)\n");
+        printf("  jobs         - list background jobs\n");
         printf("  history      - show command history\n");
         printf("  !n           - re-run the n-th command from history\n");
         return 1;
     }
 
     if (strcmp(arglist[0], "jobs") == 0) {
-        printf("Job control not yet implemented.\n");
+        print_jobs();
         return 1;
     }
 
