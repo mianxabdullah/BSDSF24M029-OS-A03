@@ -12,7 +12,7 @@
 
 #define MAX_LEN 512
 #define MAXARGS 10
-#define ARGLEN 30
+#define ARGLEN 100
 #define MAX_CMDS 10
 #define MAX_JOBS 20
 #define PROMPT "FCIT> "
@@ -37,5 +37,8 @@ void print_history(void);
 void add_job(pid_t pid, const char* cmd);
 void reap_jobs(void);
 void print_jobs(void);
+int try_assignment(char** arglist);
+void expand_variables(char** arglist);
+void print_vars(void);
 
 #endif // SHELL_H

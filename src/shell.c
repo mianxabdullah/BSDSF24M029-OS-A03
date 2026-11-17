@@ -212,6 +212,92 @@ void print_jobs(void) {
     }
 }
 
+// ---------- shell variables (linked list) ----------
+
+typedef struct var {
+    char* name;
+    char* value;
+    struct var* next;
+} var_t;
+
+static var_t* vars = NULL;
+
+static const char* get_var(const char* name) {
+    for (var_t* v = vars; v != NULL; v = v->next) {
+        if (strcmp(v->name, name) == 0) return v->value;
+    }
+    return NULL;
+}
+
+static void set_var(const char* name, const char* value) {
+    // update if it already exists
+    for (var_t* v = vars; v != NULL; v = v->next) {
+        if (strcmp(v->name, name) == 0) {
+            free(v->value);
+            v->value = strdup(value);
+            return;
+        }
+    }
+    // otherwise append a new node at the end
+    var_t* node = (var_t*)malloc(sizeof(var_t));
+    node->name = strdup(name);
+    node->value = strdup(value);
+    node->next = NULL;
+
+    if (vars == NULL) {
+        vars = node;
+    } else {
+        var_t* last = vars;
+        while (last->next != NULL) last = last->next;
+        last->next = node;
+    }
+}
+
+void print_vars(void) {
+    for (var_t* v = vars; v != NULL; v = v->next) {
+        printf("%s=%s\n", v->name, v->value);
+    }
+}
+
+// If the line is a single token NAME=value, stores it and returns 1.
+int try_assignment(char** arglist) {
+    if (arglist == NULL || arglist[0] == NULL || arglist[1] != NULL) return 0;
+
+    char* eq = strchr(arglist[0], '=');
+    if (eq == NULL || eq == arglist[0]) return 0;   // no '=' or empty name
+
+    // name must be letters, digits, underscore and not start with a digit
+    for (char* p = arglist[0]; p < eq; p++) {
+        int ok = (*p == '_') ||
+                 (*p >= 'a' && *p <= 'z') ||
+                 (*p >= 'A' && *p <= 'Z') ||
+                 (p != arglist[0] && *p >= '0' && *p <= '9');
+        if (!ok) return 0;
+    }
+
+    *eq = '\0';                                      // split name and value
+    set_var(arglist[0], eq + 1);
+    return 1;
+}
+
+// Replaces every "$NAME" argument with the variable's value.
+// Undefined variables are removed from the list.
+void expand_variables(char** arglist) {
+    int j = 0;
+    for (int i = 0; arglist[i] != NULL; i++) {
+        if (arglist[i][0] == '$' && arglist[i][1] != '\0') {
+            const char* val = get_var(arglist[i] + 1);
+            char* copy = (val != NULL) ? strdup(val) : NULL;
+            free(arglist[i]);
+            if (copy != NULL) arglist[j++] = copy;
+        } else {
+            arglist[j++] = arglist[i];
+        }
+    }
+    arglist[j] = NULL;
+}
+
+
 int handle_builtin(char** arglist) {
     if (arglist == NULL || arglist[0] == NULL) {
         return 0;
@@ -239,6 +325,8 @@ int handle_builtin(char** arglist) {
         printf("  jobs         - list background jobs\n");
         printf("  history      - show command history\n");
         printf("  !n           - re-run the n-th command from history\n");
+        printf("  set          - show all shell variables\n");
+        printf("  NAME=value   - assign a shell variable ($NAME to use it)\n");
         return 1;
     }
 
@@ -249,6 +337,11 @@ int handle_builtin(char** arglist) {
 
     if (strcmp(arglist[0], "history") == 0) {
         print_history();
+        return 1;
+    }
+
+    if (strcmp(arglist[0], "set") == 0) {
+        print_vars();
         return 1;
     }
 
