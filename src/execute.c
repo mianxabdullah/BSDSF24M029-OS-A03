@@ -7,7 +7,7 @@ int execute(char* arglist[], int background, const char* cmdline) {
 
     int ncmds = parse_pipeline(arglist, cmds);
     if (ncmds < 0) {
-        return -1;                       // syntax error already printed
+        return 1;                        // syntax error already printed
     }
 
     int prev_read = -1;                  // read end of the previous pipe
@@ -18,7 +18,7 @@ int execute(char* arglist[], int background, const char* cmdline) {
         if (i < ncmds - 1) {
             if (pipe(fds) < 0) {
                 perror("pipe failed");
-                return -1;
+                return 1;
             }
         }
 
@@ -79,11 +79,16 @@ int execute(char* arglist[], int background, const char* cmdline) {
         // don't wait: remember the last child and return to the prompt
         add_job(pids[ncmds - 1], cmdline);
         printf("[bg] started pid %d\n", (int)pids[ncmds - 1]);
-    } else {
-        // wait for every child in this pipeline
-        for (int i = 0; i < ncmds; i++) {
-            waitpid(pids[i], &status, 0);
+        return 0;
+    }
+
+    // wait for every child; the exit status of the last one is the result
+    int last_status = 0;
+    for (int i = 0; i < ncmds; i++) {
+        waitpid(pids[i], &status, 0);
+        if (i == ncmds - 1) {
+            last_status = WIFEXITED(status) ? WEXITSTATUS(status) : 1;
         }
     }
-    return 0;
+    return last_status;
 }
