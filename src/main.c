@@ -4,6 +4,13 @@
 
 #define MAX_BLOCK 20
 
+static void free_args(char** arglist) {
+    for (int i = 0; arglist[i] != NULL; i++) {
+        free(arglist[i]);
+    }
+    free(arglist);
+}
+
 // Runs one line (may contain ';' and '&').
 // Returns the exit status of the last command run.
 static int run_line(char* line) {
@@ -16,6 +23,20 @@ static int run_line(char* line) {
 
         char** arglist = tokenize(seg);
         if (arglist == NULL) continue;
+
+        // NAME=value is a built-in action, no fork
+        if (try_assignment(arglist)) {
+            status = 0;
+            free_args(arglist);
+            continue;
+        }
+
+        // replace $NAME with its value
+        expand_variables(arglist);
+        if (arglist[0] == NULL) {       // everything expanded to nothing
+            free(arglist);
+            continue;
+        }
 
         // A trailing '&' means run in the background
         int background = 0;
@@ -36,11 +57,7 @@ static int run_line(char* line) {
             }
         }
 
-        // Free the memory allocated by tokenize()
-        for (int i = 0; arglist[i] != NULL; i++) {
-            free(arglist[i]);
-        }
-        free(arglist);
+        free_args(arglist);
     }
     return status;
 }
