@@ -309,9 +309,15 @@ int handle_builtin(char** arglist) {
     }
 
     if (strcmp(arglist[0], "cd") == 0) {
-        if (arglist[1] == NULL) {
-            fprintf(stderr, "cd: missing directory\n");
-        } else if (chdir(arglist[1]) != 0) {
+        const char* target = arglist[1];
+        if (target == NULL) {
+            target = getenv("HOME");        // plain 'cd' goes home
+            if (target == NULL) {
+                fprintf(stderr, "cd: HOME not set\n");
+                return 1;
+            }
+        }
+        if (chdir(target) != 0) {
             perror("cd failed");
         }
         return 1;
@@ -320,7 +326,7 @@ int handle_builtin(char** arglist) {
     if (strcmp(arglist[0], "help") == 0) {
         printf("Built-in commands:\n");
         printf("  exit         - exit the shell\n");
-        printf("  cd <dir>     - change directory\n");
+        printf("  cd [dir]     - change directory (no argument = home)\n");
         printf("  help         - show this message\n");
         printf("  jobs         - list background jobs\n");
         printf("  history      - show command history\n");
