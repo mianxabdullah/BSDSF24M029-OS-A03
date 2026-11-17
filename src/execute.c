@@ -1,7 +1,8 @@
 #include "shell.h"
 
-int execute(char* arglist[]) {
+int execute(char* arglist[], int background, const char* cmdline) {
     command_t cmds[MAX_CMDS];
+    pid_t pids[MAX_CMDS];
     int status;
 
     int ncmds = parse_pipeline(arglist, cmds);
@@ -64,6 +65,7 @@ int execute(char* arglist[]) {
         }
 
         // Parent process: close ends it no longer needs
+        pids[i] = cpid;
         if (prev_read != -1) {
             close(prev_read);
         }
@@ -73,9 +75,15 @@ int execute(char* arglist[]) {
         }
     }
 
-    // wait for every child in the pipeline
-    for (int i = 0; i < ncmds; i++) {
-        wait(&status);
+    if (background) {
+        // don't wait: remember the last child and return to the prompt
+        add_job(pids[ncmds - 1], cmdline);
+        printf("[bg] started pid %d\n", (int)pids[ncmds - 1]);
+    } else {
+        // wait for every child in this pipeline
+        for (int i = 0; i < ncmds; i++) {
+            waitpid(pids[i], &status, 0);
+        }
     }
     return 0;
 }
