@@ -51,28 +51,42 @@ char** tokenize(char* cmdline) {
     }
 
     char* cp = cmdline;
-    char* start;
-    int len;
     int argnum = 0;
 
     while (*cp != '\0' && argnum < MAXARGS) {
         while (*cp == ' ' || *cp == '\t') cp++; // Skip leading whitespace
-        
+
         if (*cp == '\0') break; // Line was only whitespace
 
-        start = cp;
+        char* tok = arglist[argnum];
+        int len = 0;
+
         if (is_operator(*cp)) {
-            cp++;                               // operator is its own token
+            tok[len++] = *cp++;                 // operator is its own token
         } else {
-            while (*cp != '\0' && *cp != ' ' && *cp != '\t' && !is_operator(*cp)) {
+            char quote = 0;                     // 0 = not inside quotes
+            while (*cp != '\0') {
+                if (quote) {
+                    if (*cp == quote) {         // closing quote
+                        quote = 0;
+                        cp++;
+                        continue;
+                    }
+                } else {
+                    if (*cp == '"' || *cp == '\'') {   // opening quote
+                        quote = *cp;
+                        cp++;
+                        continue;
+                    }
+                    if (*cp == ' ' || *cp == '\t' || is_operator(*cp)) {
+                        break;                  // end of token
+                    }
+                }
+                if (len < ARGLEN - 1) tok[len++] = *cp;
                 cp++;
             }
         }
-
-        len = cp - start;
-        if (len > ARGLEN - 1) len = ARGLEN - 1; // don't overflow the buffer
-        strncpy(arglist[argnum], start, len);
-        arglist[argnum][len] = '\0';
+        tok[len] = '\0';
         argnum++;
     }
 
