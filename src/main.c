@@ -6,7 +6,11 @@ int main() {
     char* cmdline;
     char** arglist;
 
-    while ((cmdline = readline(PROMPT)) != NULL) {
+    while (1) {
+        reap_jobs();                    // collect finished background jobs
+
+        cmdline = readline(PROMPT);
+        if (cmdline == NULL) break;     // Ctrl+D
 
         // Handle !n before tokenizing and before adding to history
         if (cmdline[0] == '!') {
@@ -26,9 +30,29 @@ int main() {
             add_to_history(cmdline);    // our own history (history, !n)
         }
 
-        if ((arglist = tokenize(cmdline)) != NULL) {
-            if (handle_builtin(arglist) == 0) {
-                execute(arglist);
+        // Split the line on ';' and run each piece one after another
+        char* saveptr;
+        for (char* seg = strtok_r(cmdline, ";", &saveptr);
+             seg != NULL;
+             seg = strtok_r(NULL, ";", &saveptr)) {
+
+            if ((arglist = tokenize(seg)) == NULL) continue;
+
+            // A trailing '&' means run in the background
+            int background = 0;
+            int n = 0;
+            while (arglist[n] != NULL) n++;
+            if (strcmp(arglist[n - 1], "&") == 0) {
+                free(arglist[n - 1]);
+                arglist[n - 1] = NULL;
+                background = 1;
+                n--;
+            }
+
+            if (n > 0) {
+                if (handle_builtin(arglist) == 0) {
+                    execute(arglist, background, seg);
+                }
             }
 
             // Free the memory allocated by tokenize()
